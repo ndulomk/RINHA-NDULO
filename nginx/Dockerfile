@@ -17,5 +17,4 @@ USER nginx
 EXPOSE 9999
 
 STOPSIGNAL SIGQUIT
-
 CMD ["nginx", "-g", "daemon off;"]
