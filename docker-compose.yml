@@ -68,7 +68,7 @@ services:
       - POSTGRES_DB=rinha
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./app/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d rinha"]
       interval: 5s
