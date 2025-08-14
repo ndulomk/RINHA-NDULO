@@ -12,7 +12,6 @@ RUN npm ci --only=production
 # Copia o código fonte
 COPY src ./src
 COPY sql ./sql
-COPY config.js ./config.js
 
 # Configurações de saúde e monitoramento
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
