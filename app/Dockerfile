@@ -16,11 +16,11 @@ COPY config.js ./config.js
 
 # Configurações de saúde e monitoramento
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:9999/health || exit 1
 
 # Otimizações para produção
 ENV NODE_ENV=production \
-    PORT=3000 \
+    PORT=9999 \
     WORKERS=8 \
     QUEUE_SIZE=2000
 
@@ -30,6 +30,6 @@ RUN apk del python3 make g++ && \
 
 USER node
 
-EXPOSE 3000
+EXPOSE 9999
 
 CMD ["node", "--max-old-space-size=256", "src/server.js"]

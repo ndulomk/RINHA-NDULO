@@ -4,8 +4,8 @@ Esta é uma solução para o desafio da Rinha de Backend 2025, implementando um 
 
 ## Tecnologias Utilizadas
 
-- Node.js (v20)
-- Express.js
+- Node.js (v24)
+- fastify.js
 - PostgreSQL
 - Nginx (load balancing)
 - Docker

@@ -30,12 +30,12 @@ vi.mock('process', () => ({
 }));
 
 // Import the mocked functions
-import { NewWorkerPool } from './src/worker.js';
-import { parseAndValidatePayment } from './src/core.js';
-import { summaryFromDB } from './src/store.js';
+import { NewWorkerPool } from '../src/worker.js';
+import { parseAndValidatePayment } from '../src/core.js';
+import { summaryFromDB } from '../src/store.js';
 
 // Now import the registerRoutes function after all mocks are set up
-import { registerRoutes } from './src/api.js';
+import { registerRoutes } from '../src/api.js';
 
 describe('API Routes', () => {
   let fastify;
