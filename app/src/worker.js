@@ -50,39 +50,35 @@ class WorkerPool {
 
   async processPayment(payment, workerId) {
     const startTime = Date.now();
-    
+    let defaultError = null; 
     try {
       try {
         await this.client.sendToDefault(payment);
         await addPaymentToFile(payment);
         this.totalProcessed++;
-        
         const duration = Date.now() - startTime;
         if (duration > 100) {
           console.log(`Worker ${workerId}: Payment processed via default in ${duration}ms`);
         }
         return;
-      } catch (defaultError) {
+      } catch (err) {
+        defaultError = err; 
         if (defaultError.message.includes('409') || defaultError.message.includes('422')) {
           console.log(`Worker ${workerId}: Payment validation error: ${defaultError.message}`);
           return;
         }
-        
         console.log(`Worker ${workerId}: Default failed (${defaultError.message}), trying fallback...`);
       }
-
       try {
         await this.client.sendToFallback(payment);
         await addPaymentToFile(payment);
         this.totalProcessed++;
-        
         const duration = Date.now() - startTime;
         console.log(`Worker ${workerId}: Payment processed via fallback in ${duration}ms`);
       } catch (fallbackError) {
         console.error(`Worker ${workerId}: Both processors failed for payment ${payment.correlationId}`);
-        console.error(`Default error: ${defaultError?.message}`);
+        console.error(`Default error: ${defaultError?.message || 'Unknown'}`);
         console.error(`Fallback error: ${fallbackError.message}`);
-        
         try {
           await addPaymentToFile(payment);
         } catch (storeError) {

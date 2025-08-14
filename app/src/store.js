@@ -4,8 +4,8 @@ const { Pool } = pkg;
 
 const pool = new Pool({
   connectionString: getEnv('DATABASE_URL', 'postgres://rinha:rinha123@localhost:5432/rinha'),
-  max: 10,
-  idleTimeoutMillis: 30000,
+  max: 20, 
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 2000,
 });
 
@@ -38,10 +38,8 @@ async function summaryFromFile(from, to) {
   let client;
   try {
     client = await pool.connect();
-    let query = `SELECT COUNT(*) as total_requests, COALESCE(SUM(amount), 0) as total_amount
-                 FROM payments`;
+    let query = `SELECT COUNT(*) as total_requests, COALESCE(SUM(amount), 0) as total_amount FROM payments`;
     const params = [];
-
     if (from) {
       query += ` WHERE requested_at >= $${params.length + 1}`;
       params.push(from);
@@ -50,15 +48,17 @@ async function summaryFromFile(from, to) {
       query += `${from ? ' AND' : ' WHERE'} requested_at <= $${params.length + 1}`;
       params.push(to);
     }
-
     const result = await client.query(query, params);
+    if (result.rows.length === 0) {
+      return new Summary(0, 0); 
+    }
     return new Summary(
       parseInt(result.rows[0].total_requests),
       parseFloat(result.rows[0].total_amount)
     );
   } catch (error) {
     console.error(`Failed to query summary: ${error.message}`);
-    return new Summary();
+    return new Summary(0, 0); 
   } finally {
     if (client) client.release();
   }

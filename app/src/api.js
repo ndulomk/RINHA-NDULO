@@ -51,34 +51,42 @@ const summaryQuerySchema = {
     }
 };
 
-// Função auxiliar para processar summary
 async function getPaymentSummary(request, reply) {
-    const { from: fromStr, to: toStr } = request.query;
-    let from = null;
-    let to = null;
+  const { from: fromStr, to: toStr } = request.query;
+  let from = null;
+  let to = null;
 
-    if (fromStr) {
-        const parsed = new Date(fromStr);
-        if (!isNaN(parsed.getTime())) from = parsed;
+  if (fromStr) {
+    const parsed = new Date(fromStr);
+    if (isNaN(parsed.getTime())) {
+      return reply.status(400).send({ error: 'Invalid "from" timestamp' });
     }
+    from = parsed;
+  }
 
-    if (toStr) {
-        const parsed = new Date(toStr);
-        if (!isNaN(parsed.getTime())) to = parsed;
+  if (toStr) {
+    const parsed = new Date(toStr);
+    if (isNaN(parsed.getTime())) {
+      return reply.status(400).send({ error: 'Invalid "to" timestamp' });
     }
+    to = parsed;
+  }
 
-    try {
-        const summary = await summaryFromDB(from, to);
-        reply.status(200).send({
-            totalRequests: summary.totalRequests,
-            totalAmount: summary.totalAmount,
-        });
-    } catch (error) {
-        console.error('Error fetching payment summary:', error.message);
-        reply.status(500).send({ error: 'Failed to fetch payment summary' });
+  try {
+    const summary = await summaryFromDB(from, to);
+    if (!summary || typeof summary.totalRequests !== 'number' || typeof summary.totalAmount !== 'number') {
+      console.error('Invalid summary data:', summary);
+      return reply.status(500).send({ error: 'Invalid summary data from database' });
     }
+    return reply.status(200).send({
+      totalRequests: summary.totalRequests,
+      totalAmount: summary.totalAmount,
+    });
+  } catch (error) {
+    console.error('Error fetching payment summary:', error.message, error.stack);
+    return reply.status(500).send({ error: 'Failed to fetch payment summary' });
+  }
 }
-
 export async function registerRoutes(fastify) {
     // Initialize pool lazily when routes are registered
     const workerPool = initializePool();
