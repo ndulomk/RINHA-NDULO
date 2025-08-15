@@ -74,13 +74,21 @@ async function getPaymentSummary(request, reply) {
 
   try {
     const summary = await summaryFromDB(from, to);
-    if (!summary || typeof summary.totalRequests !== 'number' || typeof summary.totalAmount !== 'number') {
+    
+    if (!summary || !summary.default || !summary.fallback) {
       console.error('Invalid summary data:', summary);
       return reply.status(500).send({ error: 'Invalid summary data from database' });
     }
+    
     return reply.status(200).send({
-      totalRequests: summary.totalRequests,
-      totalAmount: summary.totalAmount,
+      default: {
+        totalRequests: summary.default.totalRequests,
+        totalAmount: summary.default.totalAmount,
+      },
+      fallback: {
+        totalRequests: summary.fallback.totalRequests,
+        totalAmount: summary.fallback.totalAmount,
+      }
     });
   } catch (error) {
     console.error('Error fetching payment summary:', error.message, error.stack);

@@ -16,15 +16,15 @@ class Summary {
   }
 }
 
-async function addPaymentToFile(payment) {
+async function addPaymentToFile(payment, processor = 'unknown') {
   let client;
   try {
     client = await pool.connect();
     await client.query(
-      `INSERT INTO payments (correlationId, amount, requested_at) 
-       VALUES ($1, $2, $3) 
-       ON CONFLICT (correlationId) DO NOTHING`,
-      [payment.correlationId, payment.amount, payment.requestedAt]
+      `INSERT INTO payments (correlationId, amount, requested_at, processor) 
+       VALUES ($1, $2, $3, $4) 
+       ON CONFLICT (correlationId) DO UPDATE SET processor = $4`,
+      [payment.correlationId, payment.amount, payment.requestedAt, processor]
     );
   } catch (error) {
     console.error(`Failed to insert payment: ${error.message}`);
@@ -38,27 +38,55 @@ async function summaryFromFile(from, to) {
   let client;
   try {
     client = await pool.connect();
-    let query = `SELECT COUNT(*) as total_requests, COALESCE(SUM(amount), 0) as total_amount FROM payments`;
-    const params = [];
+    
+    let defaultQuery = `SELECT COUNT(*) as total_requests, COALESCE(SUM(amount), 0) as total_amount 
+                        FROM payments WHERE processor = 'default'`;
+    const defaultParams = [];
+    
     if (from) {
-      query += ` WHERE requested_at >= $${params.length + 1}`;
-      params.push(from);
+      defaultQuery += ` AND requested_at >= $${defaultParams.length + 1}`;
+      defaultParams.push(from);
     }
     if (to) {
-      query += `${from ? ' AND' : ' WHERE'} requested_at <= $${params.length + 1}`;
-      params.push(to);
+      defaultQuery += ` AND requested_at <= $${defaultParams.length + 1}`;
+      defaultParams.push(to);
     }
-    const result = await client.query(query, params);
-    if (result.rows.length === 0) {
-      return new Summary(0, 0); 
+    
+    let fallbackQuery = `SELECT COUNT(*) as total_requests, COALESCE(SUM(amount), 0) as total_amount 
+                         FROM payments WHERE processor = 'fallback'`;
+    const fallbackParams = [];
+    
+    if (from) {
+      fallbackQuery += ` AND requested_at >= $${fallbackParams.length + 1}`;
+      fallbackParams.push(from);
     }
-    return new Summary(
-      parseInt(result.rows[0].total_requests),
-      parseFloat(result.rows[0].total_amount)
-    );
+    if (to) {
+      fallbackQuery += ` AND requested_at <= $${fallbackParams.length + 1}`;
+      fallbackParams.push(to);
+    }
+    
+    const [defaultResult, fallbackResult] = await Promise.all([
+      client.query(defaultQuery, defaultParams),
+      client.query(fallbackQuery, fallbackParams)
+    ]);
+    
+    return {
+      default: new Summary(
+        parseInt(defaultResult.rows[0].total_requests),
+        parseFloat(defaultResult.rows[0].total_amount)
+      ),
+      fallback: new Summary(
+        parseInt(fallbackResult.rows[0].total_requests),
+        parseFloat(fallbackResult.rows[0].total_amount)
+      )
+    };
+    
   } catch (error) {
     console.error(`Failed to query summary: ${error.message}`);
-    return new Summary(0, 0); 
+    return {
+      default: new Summary(0, 0),
+      fallback: new Summary(0, 0)
+    };
   } finally {
     if (client) client.release();
   }

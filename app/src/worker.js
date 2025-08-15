@@ -48,47 +48,52 @@ class WorkerPool {
     }
   }
 
-  async processPayment(payment, workerId) {
-    const startTime = Date.now();
-    let defaultError = null; 
+async processPayment(payment, workerId) {
+  const startTime = Date.now();
+  let defaultError = null; 
+  let processor = 'unknown';
+  
+  try {
     try {
-      try {
-        await this.client.sendToDefault(payment);
-        await addPaymentToFile(payment);
-        this.totalProcessed++;
-        const duration = Date.now() - startTime;
-        if (duration > 100) {
-          console.log(`Worker ${workerId}: Payment processed via default in ${duration}ms`);
-        }
+      await this.client.sendToDefault(payment);
+      processor = 'default';
+      await addPaymentToFile(payment, processor);
+      this.totalProcessed++;
+      const duration = Date.now() - startTime;
+      if (duration > 100) {
+        console.log(`Worker ${workerId}: Payment processed via default in ${duration}ms`);
+      }
+      return;
+    } catch (err) {
+      defaultError = err; 
+      if (defaultError.message.includes('409') || defaultError.message.includes('422')) {
+        console.log(`Worker ${workerId}: Payment validation error: ${defaultError.message}`);
         return;
-      } catch (err) {
-        defaultError = err; 
-        if (defaultError.message.includes('409') || defaultError.message.includes('422')) {
-          console.log(`Worker ${workerId}: Payment validation error: ${defaultError.message}`);
-          return;
-        }
-        console.log(`Worker ${workerId}: Default failed (${defaultError.message}), trying fallback...`);
       }
-      try {
-        await this.client.sendToFallback(payment);
-        await addPaymentToFile(payment);
-        this.totalProcessed++;
-        const duration = Date.now() - startTime;
-        console.log(`Worker ${workerId}: Payment processed via fallback in ${duration}ms`);
-      } catch (fallbackError) {
-        console.error(`Worker ${workerId}: Both processors failed for payment ${payment.correlationId}`);
-        console.error(`Default error: ${defaultError?.message || 'Unknown'}`);
-        console.error(`Fallback error: ${fallbackError.message}`);
-        try {
-          await addPaymentToFile(payment);
-        } catch (storeError) {
-          console.error(`Worker ${workerId}: Failed to store unprocessed payment: ${storeError.message}`);
-        }
-      }
-    } catch (error) {
-      console.error(`Worker ${workerId}: Unexpected error processing payment: ${error.message}`);
+      console.log(`Worker ${workerId}: Default failed (${defaultError.message}), trying fallback...`);
     }
+    
+    try {
+      await this.client.sendToFallback(payment);
+      processor = 'fallback';
+      await addPaymentToFile(payment, processor);
+      this.totalProcessed++;
+      const duration = Date.now() - startTime;
+      console.log(`Worker ${workerId}: Payment processed via fallback in ${duration}ms`);
+    } catch (fallbackError) {
+      console.error(`Worker ${workerId}: Both processors failed for payment ${payment.correlationId}`);
+      console.error(`Default error: ${defaultError?.message || 'Unknown'}`);
+      console.error(`Fallback error: ${fallbackError.message}`);
+      try {
+        await addPaymentToFile(payment, 'failed');
+      } catch (storeError) {
+        console.error(`Worker ${workerId}: Failed to store unprocessed payment: ${storeError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Worker ${workerId}: Unexpected error processing payment: ${error.message}`);
   }
+}
 
   getStats() {
     return {
